@@ -365,15 +365,18 @@ document.getElementById('water-plus').addEventListener('click', () => {
 
 // ── 提醒功能 ──────────────────────────────────────────
 function initReminder() {
+  const timeEl = document.getElementById('reminder-time');
+  if (!timeEl) return;
   const saved = localStorage.getItem('reminder_time');
-  if (saved) document.getElementById('reminder-time').value = saved;
+  if (saved) timeEl.value = saved;
   updateReminderStatus();
 }
 
 function updateReminderStatus() {
   const el = document.getElementById('reminder-status');
+  if (!el) return;
   const time = localStorage.getItem('reminder_time');
-  const perm = Notification.permission;
+  const perm = (typeof Notification !== 'undefined') ? Notification.permission : 'default';
   if (!time) { el.textContent = '尚未设置提醒时间'; return; }
   if (perm === 'granted') {
     el.innerHTML = `<span style="color:#3b6d11;">✓ 提醒已设置：每天 ${time}，浏览器开启时生效</span>`;
@@ -384,18 +387,23 @@ function updateReminderStatus() {
   }
 }
 
-document.getElementById('reminder-save').addEventListener('click', () => {
-  const time = document.getElementById('reminder-time').value;
-  localStorage.setItem('reminder_time', time);
-  if ('Notification' in window && Notification.permission !== 'granted') {
-    Notification.requestPermission().then(updateReminderStatus);
-  } else {
-    updateReminderStatus();
-  }
-});
+const reminderSaveBtn = document.getElementById('reminder-save');
+if (reminderSaveBtn) {
+  reminderSaveBtn.addEventListener('click', () => {
+    const timeEl = document.getElementById('reminder-time');
+    if (!timeEl) return;
+    const time = timeEl.value;
+    localStorage.setItem('reminder_time', time);
+    if (typeof Notification !== 'undefined' && Notification.permission !== 'granted') {
+      Notification.requestPermission().then(updateReminderStatus);
+    } else {
+      updateReminderStatus();
+    }
+  });
+}
 
 function checkAndNotify() {
-  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
   const time = localStorage.getItem('reminder_time');
   if (!time) return;
   const now = new Date();
@@ -403,15 +411,11 @@ function checkAndNotify() {
   if (now.getHours() === h && now.getMinutes() === m) {
     const todayDone = !!loadRecords()[todayKey()];
     if (!todayDone) {
-      new Notification('今日健康记录', {
-        body: '今天还没有记录哦，只需要1分钟 ✨',
-        icon: ''
-      });
+      new Notification('今日健康记录', { body: '今天还没有记录哦，只需要1分钟 ✨' });
     }
   }
 }
-setInterval(checkAndNotify, 60000);
-initReminder();
+try { setInterval(checkAndNotify, 60000); initReminder(); } catch(e) {}
 
 // ── 提交 ──────────────────────────────────────────────
 document.getElementById('submit-btn').addEventListener('click', () => {
