@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>每日健康记录</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body { background: #f7f6f3; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", sans-serif; display: flex; justify-content: center; padding: 1.5rem 1rem 3rem; min-height: 100vh; }
+    .wrap { width: 100%; max-width: 420px; }
+
+    /* 顶部导航 */
+    .nav { display: flex; gap: 8px; margin-bottom: 1.25rem; }
+    .nav-btn { flex: 1; padding: 10px; border-radius: 12px; border: 1px solid #e0e0e0; background: #fff; font-size: 14px; cursor: pointer; color: #888; touch-action: manipulation; }
+    .nav-btn.active { background: #534ab7; color: #fff; border-color: #534ab7; }
+
+    .page { display: none; }
+    .page.active { display: block; }
+
+    .date-bar { font-size: 13px; color: #888; margin-bottom: 1.25rem; }
+    .card { background: #fff; border-radius: 16px; padding: 1.25rem; margin-bottom: 1rem; }
+    .section-label { font-size: 11px; color: #bbb; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .section-title { font-size: 15px; font-weight: 500; color: #1a1a1a; margin-bottom: 0.9rem; }
+
+    /* 食物分组 */
+    .food-group { margin-bottom: 0.9rem; }
+    .food-group-label { font-size: 11px; color: #bbb; margin-bottom: 6px; padding-left: 2px; }
+    .chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip { padding: 8px 14px; border-radius: 20px; border: 1px solid #e0e0e0; background: #fff; font-size: 13px; cursor: pointer; color: #444; user-select: none; touch-action: manipulation; -webkit-appearance: none; }
+    .chip.sel { background: #eeedfe; border-color: #534ab7; color: #3c3489; }
+    .chip:active { opacity: 0.75; }
+
+    /* 身体信号 — 多选，颜色不同 */
+    .chip.signal { border-color: #e8e8e8; }
+    .chip.signal.sel { background: #faeeda; border-color: #ba7517; color: #633806; }
+
+    /* 睡眠 / 饮水加减 */
+    .sleep-row { display: flex; align-items: center; gap: 16px; }
+    .sleep-btn { width: 44px; height: 44px; border-radius: 50%; border: 1px solid #e0e0e0; background: #fff; font-size: 20px; cursor: pointer; color: #333; display: flex; align-items: center; justify-content: center; touch-action: manipulation; -webkit-appearance: none; }
+    .sleep-btn:active { background: #f0f0f0; }
+    .sleep-val { font-size: 28px; font-weight: 500; min-width: 40px; text-align: center; color: #1a1a1a; }
+    .sleep-unit { font-size: 14px; color: #888; }
+
+    /* 提交 */
+    .submit-btn { width: 100%; padding: 15px; border-radius: 14px; border: none; background: #534ab7; color: #fff; font-size: 16px; font-weight: 500; cursor: pointer; margin-top: 0.5rem; touch-action: manipulation; -webkit-appearance: none; }
+    .submit-btn:active { opacity: 0.88; }
+
+    /* 完成页 */
+    .done-card { background: #fff; border-radius: 16px; padding: 3rem 1.25rem; text-align: center; }
+    .done-icon { font-size: 44px; margin-bottom: 0.75rem; }
+    .done-text { font-size: 17px; font-weight: 500; color: #1a1a1a; }
+    .done-sub { font-size: 13px; color: #aaa; margin-top: 6px; line-height: 1.7; }
+    .done-link { display: inline-block; margin-top: 1.25rem; font-size: 13px; color: #534ab7; cursor: pointer; text-decoration: underline; background: none; border: none; touch-action: manipulation; }
+
+    /* 统计页 */
+    .stat-card { background: #fff; border-radius: 16px; padding: 1.25rem; margin-bottom: 1rem; }
+    .stat-title { font-size: 14px; font-weight: 500; color: #1a1a1a; margin-bottom: 1rem; }
+    .stat-empty { font-size: 13px; color: #bbb; text-align: center; padding: 1.5rem 0; }
+
+    /* 睡眠折线图 */
+    .chart-wrap { position: relative; height: 120px; }
+    canvas { width: 100% !important; }
+
+    /* 信号频率条 */
+    .signal-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .signal-bar-label { font-size: 12px; color: #666; width: 70px; flex-shrink: 0; }
+    .signal-bar-bg { flex: 1; height: 8px; background: #f0ede8; border-radius: 4px; overflow: hidden; }
+    .signal-bar-fill { height: 100%; background: #ba7517; border-radius: 4px; transition: width 0.4s; }
+    .signal-bar-count { font-size: 12px; color: #aaa; width: 24px; text-align: right; }
+
+    /* 食物覆盖率 */
+    .food-cover-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .food-cover-label { font-size: 12px; color: #666; width: 90px; flex-shrink: 0; }
+    .food-cover-bg { flex: 1; height: 8px; background: #f0ede8; border-radius: 4px; overflow: hidden; }
+    .food-cover-fill { height: 100%; background: #534ab7; border-radius: 4px; transition: width 0.4s; }
+    .food-cover-pct { font-size: 12px; color: #aaa; width: 36px; text-align: right; }
+
+    /* 历史列表 */
+    .history-item { border-bottom: 1px solid #f0f0f0; padding: 0.75rem 0; font-size: 13px; }
+    .history-item:last-child { border-bottom: none; }
+    .history-date { font-weight: 500; color: #1a1a1a; margin-bottom: 4px; }
+    .history-detail { color: #888; line-height: 1.6; }
+    .tag { display: inline-block; background: #f3f2fe; color: #534ab7; border-radius: 10px; padding: 2px 8px; font-size: 11px; margin: 2px 2px 0 0; }
+    .tag.signal-tag { background: #faeeda; color: #633806; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <div style="text-align:center;padding:1.25rem 0 1rem;">
+    <div style="font-size:18px;font-weight:500;color:#1a1a1a;margin-bottom:4px;">每日健康记录</div>
+    <div style="font-size:12px;color:#bbb;line-height:1.7;">专为女性设计 · 记录饮食、睡眠与身体状态<br>数据保存在本设备，不会上传到任何地方</div>
+  </div>
+
+  <div class="nav">
+    <button class="nav-btn active" onclick="switchPage('record')">今日记录</button>
+    <button class="nav-btn" onclick="switchPage('stats')">数据统计</button>
+    <button class="nav-btn" onclick="switchPage('history')">历史记录</button>
+  </div>
+
+  <!-- 记录页 -->
+  <div class="page active" id="page-record">
+    <div class="date-bar">今天 · <span id="today-date"></span></div>
+
+    <div id="form-view">
+
+      <!-- 饮食 -->
+      <div class="card">
+        <div class="section-label">饮食</div>
+        <div class="section-title">今天吃了哪些？</div>
+
+        <div class="food-group">
+          <div class="food-group-label">奶蛋豆类（补钙蛋白）</div>
+          <div class="chip-row">
+            <button class="chip" data-group="food" data-key="milk">🥛 牛奶 / 豆浆</button>
+            <button class="chip" data-group="food" data-key="egg">🥚 鸡蛋</button>
+            <button class="chip" data-group="food" data-key="tofu">🫘 豆腐</button>
+          </div>
+        </div>
+
+        <div class="food-group">
+          <div class="food-group-label">主食（能量来源）</div>
+          <div class="chip-row">
+            <button class="chip" data-group="food" data-key="rice">🍚 米饭</button>
+            <button class="chip" data-group="food" data-key="noodle">🍜 面食</button>
+            <button class="chip" data-group="food" data-key="porridge">🥣 稀饭 / 粥</button>
+          </div>
+        </div>
+
+        <div class="food-group">
+          <div class="food-group-label">蔬菜水果</div>
+          <div class="chip-row">
+            <button class="chip" data-group="food" data-key="veggie">🥦 深色蔬菜</button>
+            <button class="chip" data-group="food" data-key="fruit">🍊 水果</button>
+          </div>
+        </div>
+
+        <div class="food-group" style="margin-bottom:0;">
+          <div class="food-group-label">蛋白质 / 坚果</div>
+          <div class="chip-row">
+            <button class="chip" data-group="food" data-key="meat">🥩 肉类</button>
+            <button class="chip" data-group="food" data-key="nut">🥜 坚果</button>
+            <button class="chip" data-group="food" data-key="fish">🐟 鱼 / 虾</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 睡眠 -->
+      <div class="card">
+        <div class="section-label">睡眠</div>
+        <div class="section-title">昨晚睡了几小时？</div>
+        <div class="sleep-row">
+          <button class="sleep-btn" id="sleep-minus">−</button>
+          <span class="sleep-val" id="sleep-val">7</span>
+          <span class="sleep-unit">小时</span>
+          <button class="sleep-btn" id="sleep-plus">+</button>
+        </div>
+      </div>
+
+      <!-- 身体信号 — 多选 -->
+      <div class="card">
+        <div class="section-label">身体信号</div>
+        <div class="section-title">今天有哪些不适？（可多选，没有就不选）</div>
+        <div class="chip-row">
+          <button class="chip signal" data-group="signal" data-key="cramp">腿抽筋</button>
+          <button class="chip signal" data-group="signal" data-key="back">腰酸背痛</button>
+          <button class="chip signal" data-group="signal" data-key="fatigue">容易疲倦</button>
+          <button class="chip signal" data-group="signal" data-key="hotflash">潮热 / 出汗</button>
+          <button class="chip signal" data-group="signal" data-key="headache">头痛</button>
+          <button class="chip signal" data-group="signal" data-key="insomnia">睡眠差</button>
+          <button class="chip signal" data-group="signal" data-key="bloat">腹胀 / 消化差</button>
+        </div>
+      </div>
+
+      <!-- 饮水 -->
+      <div class="card">
+        <div class="section-label">饮水</div>
+        <div class="section-title">今天喝了多少白水？</div>
+        <div class="sleep-row">
+          <button class="sleep-btn" id="water-minus">−</button>
+          <span class="sleep-val" id="water-val">4</span>
+          <span class="sleep-unit">杯（约 <span id="water-ml">800</span> ml）</span>
+          <button class="sleep-btn" id="water-plus">+</button>
+        </div>
+        <div style="margin-top:10px;">
+          <div style="font-size:11px;color:#bbb;margin-bottom:6px;">今天还喝了？（不计入白水，仅作参考）</div>
+          <div class="chip-row">
+            <button class="chip" data-group="liquid" data-key="soymilk">🥛 豆浆</button>
+            <button class="chip" data-group="liquid" data-key="porridge_w">🥣 稀饭 / 粥</button>
+            <button class="chip" data-group="liquid" data-key="soup">🍵 汤</button>
+            <button class="chip" data-group="liquid" data-key="tea">🍃 淡茶</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 情绪 -->
+      <div class="card">
+        <div class="section-label">情绪</div>
+        <div class="section-title">今天心情怎么样？</div>
+        <div class="chip-row">
+          <button class="chip" data-group="mood" data-key="good">😊 还不错</button>
+          <button class="chip" data-group="mood" data-key="normal">😐 一般</button>
+          <button class="chip" data-group="mood" data-key="bad">😔 有点差</button>
+        </div>
+      </div>
+
+      <button class="submit-btn" id="submit-btn">记录完成</button>
+    </div>
+
+    <div id="done-view" style="display:none;">
+      <div class="done-card">
+        <div class="done-icon">✓</div>
+        <div class="done-text">今天记录完成</div>
+        <div class="done-sub">数据已保存在本设备<br>明天同一时间再来一次就好</div>
+        <button class="done-link" onclick="switchPage('stats')">查看数据统计 →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 统计页 -->
+  <div class="page" id="page-stats">
+    <div class="date-bar" id="stats-bar">数据统计</div>
+
+    <div class="stat-card">
+      <div class="stat-title">睡眠时长趋势</div>
+      <div class="chart-wrap">
+        <canvas id="sleep-chart"></canvas>
+      </div>
+      <div id="sleep-insight" style="margin-top:8px;font-size:12px;color:#888;line-height:1.7;"></div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-title">身体不适出现频率</div>
+      <div id="signal-stats"></div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-title">今日营养摄入分析</div>
+      <div id="food-stats"></div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-title">饮水趋势</div>
+      <div class="chart-wrap">
+        <canvas id="water-chart"></canvas>
+      </div>
+      <div id="water-insight" style="margin-top:8px;font-size:12px;line-height:1.7;"></div>
+    </div>
+
+    <div class="stat-card" id="nutrition-insight-card" style="display:none;">
+      <div class="stat-title">今天吃得怎么样？</div>
+      <div id="nutrition-insight"></div>
+    </div>
+
+    <div class="stat-card" style="background:#f7f6f3;border:1px dashed #ddd;">
+      <div style="font-size:13px;font-weight:500;color:#555;margin-bottom:10px;">⏰ 每日提醒设置</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+        <label style="font-size:13px;color:#666;flex-shrink:0;">提醒时间</label>
+        <input type="time" id="reminder-time" value="20:00" style="flex:1;padding:6px 10px;border-radius:8px;border:1px solid #e0e0e0;font-size:14px;background:#fff;">
+        <button id="reminder-save" style="padding:7px 14px;border-radius:8px;border:none;background:#534ab7;color:#fff;font-size:13px;cursor:pointer;">设置</button>
+      </div>
+      <div id="reminder-status" style="font-size:12px;color:#aaa;line-height:1.6;"></div>
+      <div style="margin-top:8px;font-size:11px;color:#ccc;line-height:1.6;">
+        提醒依赖浏览器通知权限。若浏览器在后台被系统关闭，提醒可能不触发。<br>
+        替代方案：在手机日历设置每日重复提醒，打开此页面记录。
+      </div>
+    </div>
+
+    <div class="stat-card" style="background:#f7f6f3;border:1px dashed #ddd;">
+      <div style="font-size:12px;color:#aaa;line-height:1.8;">
+        💡 <strong style="color:#888;">保存到手机桌面</strong><br>
+        用手机浏览器打开此页面 → 点击分享按钮 → 选择"添加到主屏幕"，以后像App一样直接打开。
+      </div>
+    </div>
+  </div>
+
+  <!-- 历史页 -->
+  <div class="page" id="page-history">
+    <div class="date-bar">所有记录</div>
+    <div class="card" id="history-list"></div>
+  </div>
+
+</div>
+
+<script>
+// ── 工具函数 ──────────────────────────────────────────
+function toggleTip(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+const STORAGE_KEY = 'health_records_v1';
+
+function loadRecords() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+  catch(e) { return {}; }
+}
+
+function saveRecord(dateKey, data) {
+  const all = loadRecords();
+  all[dateKey] = data;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+}
+
+function todayKey() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function formatKey(key) {
+  const parts = key.split('-');
+  return parts[1] + '月' + parts[2] + '日';
+}
+
+// ── 页面切换 ──────────────────────────────────────────
+function switchPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  const idx = { record: 0, stats: 1, history: 2 };
+  document.querySelectorAll('.nav-btn')[idx[name]].classList.add('active');
+  if (name === 'stats') renderStats();
+  if (name === 'history') renderHistory();
+}
+
+// ── 日期 ──────────────────────────────────────────────
+const d = new Date();
+document.getElementById('today-date').textContent = (d.getMonth()+1) + '月' + d.getDate() + '日';
+
+// ── Chip 交互 ─────────────────────────────────────────
+// food & signal: 多选；mood: 单选
+document.querySelectorAll('.chip').forEach(c => {
+  c.addEventListener('click', () => {
+    const g = c.dataset.group;
+    if (g === 'mood') {
+      document.querySelectorAll('.chip[data-group="mood"]').forEach(x => x.classList.remove('sel'));
+      c.classList.add('sel');
+    } else {
+      c.classList.toggle('sel');
+    }
+  });
+});
+
+// ── 睡眠 ──────────────────────────────────────────────
+let sleepHours = 7;
+document.getElementById('sleep-minus').addEventListener('click', () => {
+  if (sleepHours > 3) { sleepHours--; document.getElementById('sleep-val').textContent = sleepHours; }
+});
+document.getElementById('sleep-plus').addEventListener('click', () => {
+  if (sleepHours < 12) { sleepHours++; document.getElementById('sleep-val').textContent = sleepHours; }
+});
+
+// ── 饮水 ──────────────────────────────────────────────
+let waterCups = 4;
+function updateWaterDisplay() {
+  document.getElementById('water-val').textContent = waterCups;
+  document.getElementById('water-ml').textContent = waterCups * 200;
+}
+document.getElementById('water-minus').addEventListener('click', () => {
+  if (waterCups > 0) { waterCups--; updateWaterDisplay(); }
+});
+document.getElementById('water-plus').addEventListener('click', () => {
+  if (waterCups < 15) { waterCups++; updateWaterDisplay(); }
+});
+
+// ── 提醒功能 ──────────────────────────────────────────
+function initReminder() {
+  const saved = localStorage.getItem('reminder_time');
+  if (saved) document.getElementById('reminder-time').value = saved;
+  updateReminderStatus();
+}
+
+function updateReminderStatus() {
+  const el = document.getElementById('reminder-status');
+  const time = localStorage.getItem('reminder_time');
+  const perm = Notification.permission;
+  if (!time) { el.textContent = '尚未设置提醒时间'; return; }
+  if (perm === 'granted') {
+    el.innerHTML = `<span style="color:#3b6d11;">✓ 提醒已设置：每天 ${time}，浏览器开启时生效</span>`;
+  } else if (perm === 'denied') {
+    el.innerHTML = '<span style="color:#d85a30;">浏览器通知已被拒绝，请在浏览器设置中手动开启</span>';
+  } else {
+    el.textContent = '点击"设置"后会请求通知权限';
+  }
+}
+
+document.getElementById('reminder-save').addEventListener('click', () => {
+  const time = document.getElementById('reminder-time').value;
+  localStorage.setItem('reminder_time', time);
+  if ('Notification' in window && Notification.permission !== 'granted') {
+    Notification.requestPermission().then(updateReminderStatus);
+  } else {
+    updateReminderStatus();
+  }
+});
+
+function checkAndNotify() {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const time = localStorage.getItem('reminder_time');
+  if (!time) return;
+  const now = new Date();
+  const [h, m] = time.split(':').map(Number);
+  if (now.getHours() === h && now.getMinutes() === m) {
+    const todayDone = !!loadRecords()[todayKey()];
+    if (!todayDone) {
+      new Notification('今日健康记录', {
+        body: '今天还没有记录哦，只需要1分钟 ✨',
+        icon: ''
+      });
+    }
+  }
+}
+setInterval(checkAndNotify, 60000);
+initReminder();
+
+// ── 提交 ──────────────────────────────────────────────
+document.getElementById('submit-btn').addEventListener('click', () => {
+  const food = [...document.querySelectorAll('.chip[data-group="food"].sel')].map(c => c.dataset.key);
+  const signal = [...document.querySelectorAll('.chip[data-group="signal"].sel')].map(c => c.dataset.key);
+  const liquid = [...document.querySelectorAll('.chip[data-group="liquid"].sel')].map(c => c.dataset.key);
+  const moodEl = document.querySelector('.chip[data-group="mood"].sel');
+  const mood = moodEl ? moodEl.dataset.key : 'normal';
+
+  const record = {
+    date: todayKey(),
+    sleep: sleepHours,
+    water: waterCups,
+    liquid: liquid,
+    food: food,
+    signal: signal,
+    mood: mood,
+    ts: Date.now()
+  };
+
+  saveRecord(todayKey(), record);
+  document.getElementById('form-view').style.display = 'none';
+  document.getElementById('done-view').style.display = 'block';
+});
+
+// ── 统计页渲染 ────────────────────────────────────────
+const FOOD_LABELS = {
+  milk: '牛奶/豆浆', egg: '鸡蛋', tofu: '豆腐',
+  rice: '米饭', noodle: '面食', porridge: '稀饭/粥',
+  veggie: '深色蔬菜', fruit: '水果',
+  fish: '鱼/虾', meat: '肉类', nut: '坚果'
+};
+const SIGNAL_LABELS = {
+  cramp: '腿抽筋', back: '腰酸背痛', fatigue: '容易疲倦',
+  hotflash: '潮热/出汗', headache: '头痛', insomnia: '睡眠差', bloat: '腹胀'
+};
+const NUTRIENT_GROUPS = [
+  {
+    key:'phyto', label:'植物雌激素', color:'#534ab7', lightColor:'#eeedfe',
+    items:['milk','tofu'],
+    desc:'有助于缓解潮热、情绪波动',
+    suggest:'豆浆、豆腐（每天一份即可）',
+    tip:'豆腐、豆浆里含有"大豆异黄酮"，结构和女性雌激素很像。更年期前后雌激素减少，它能起到一点补偿作用，研究显示可以减少潮热次数、减缓骨质流失。'
+  },
+  {
+    key:'calcium', label:'钙质来源', color:'#1d9e75', lightColor:'#e1f5ee',
+    items:['milk','tofu','fish'],
+    desc:'骨密度保护，减少腰酸腿抽筋',
+    suggest:'牛奶一杯、豆腐、或小鱼干',
+    tip:'这个年龄段骨质流失加快，缺钙会导致腰酸、腿抽筋，严重了就是骨质疏松。牛奶、豆腐、小鱼都是好来源，比钙片更容易吸收。'
+  },
+  {
+    key:'protein', label:'优质蛋白', color:'#d85a30', lightColor:'#faece7',
+    items:['egg','fish','meat','tofu'],
+    desc:'维持肌肉量，支撑代谢正常运转',
+    suggest:'鸡蛋、豆腐、鱼或肉，选其中一样就够',
+    tip:'蛋白质是肌肉的原料。肌肉越多，基础代谢越高，不容易发胖。鸡蛋、豆腐的蛋白质质量接近肉类，吃素也能补够。吃了肉就不必再追着吃鱼，两者选一即可。'
+  },
+  {
+    key:'carb', label:'碳水 / 能量', color:'#ba7517', lightColor:'#faeeda',
+    items:['rice','noodle','porridge'],
+    desc:'保证基础代谢，避免节食伤代谢',
+    suggest:'米饭、面食、稀饭，选一样即可',
+    tip:'女性如果吃得太少，大脑会以为在"挨饿"，主动降低代谢来省能量，反而更难瘦。主食不能省，粥和面食都算数。'
+  },
+  {
+    key:'fiber', label:'膳食纤维 / 维生素', color:'#3b6d11', lightColor:'#eaf3de',
+    items:['veggie','fruit'],
+    desc:'肠道健康，抗氧化，皮肤与免疫',
+    suggest:'深色蔬菜一份，或水果一个',
+    tip:'深色蔬菜和水果含维生素C、叶酸、膳食纤维，帮助消化、减少便秘，对皮肤和免疫力也有好处。颜色越深的蔬菜，营养越丰富。'
+  },
+  {
+    key:'fat', label:'优质脂肪', color:'#993556', lightColor:'#fbeaf0',
+    items:['nut','fish'],
+    desc:'激素合成原料，保护心血管',
+    suggest:'一小把坚果（核桃/杏仁），或吃一次鱼',
+    tip:'坚果和深海鱼里的Omega-3是合成激素的原料，还能保护心血管。普通肉类的脂肪不算这一类。一天没吃不用担心，长期注意就好。'
+  }
+];
+
+function getLast14() {
+  const all = loadRecords();
+  const keys = Object.keys(all).sort().slice(-14);
+  return keys.map(k => all[k]);
+}
+
+function renderStats() {
+  const records = getLast14();
+  const n = records.length;
+
+  // 更新顶部说明
+  document.getElementById('stats-bar').textContent =
+    n === 0 ? '数据统计' : '近' + n + '天数据';
+
+  if (n === 0) {
+    document.getElementById('signal-stats').innerHTML = '<div class="stat-empty">暂无数据，先记录一天再来看</div>';
+    document.getElementById('food-stats').innerHTML = '<div class="stat-empty">暂无数据</div>';
+    drawSleepChart([]);
+    return;
+  }
+
+  // 睡眠折线图（用 setTimeout 确保页面已显示，offsetWidth 有值）
+  setTimeout(() => { drawSleepChart(records); drawWaterChart(records); }, 30);
+
+  // 身体信号频率 — 0次的隐藏，全部0则显示"状态良好"
+  const signalCount = {};
+  records.forEach(r => (r.signal || []).forEach(s => { signalCount[s] = (signalCount[s] || 0) + 1; }));
+  const hasAnySignal = Object.values(signalCount).some(v => v > 0);
+  if (!hasAnySignal) {
+    document.getElementById('signal-stats').innerHTML =
+      '<div style="text-align:center;padding:1rem 0;font-size:14px;color:#3b6d11;">近期状态良好，没有明显不适 🌿</div>';
+  } else {
+    const signalHTML = Object.keys(SIGNAL_LABELS).map(key => {
+      const count = signalCount[key] || 0;
+      if (count === 0) return '';
+      const pct = Math.round(count / n * 100);
+      return `<div class="signal-bar-row">
+        <div class="signal-bar-label">${SIGNAL_LABELS[key]}</div>
+        <div class="signal-bar-bg"><div class="signal-bar-fill" style="width:${pct}%"></div></div>
+        <div class="signal-bar-count">${count}次</div>
+      </div>`;
+    }).join('');
+    document.getElementById('signal-stats').innerHTML = signalHTML;
+  }
+
+  // 今日食物 + 历史
+  const todayRecord = loadRecords()[todayKey()];
+  const todayFoods = todayRecord ? (todayRecord.food || []) : [];
+  renderFoodStats(todayFoods, records);
+  renderNutritionInsight(todayFoods);
+
+  // 睡眠分析文字
+  const sleepEl = document.getElementById('sleep-insight');
+  if (todayRecord && todayRecord.sleep != null) {
+    const s = todayRecord.sleep;
+    const avg = n > 1 ? Math.round(records.reduce((a,r) => a+(r.sleep||7),0)/n*10)/10 : null;
+    let txt = `今天睡了 ${s} 小时。`;
+    let tip = '';
+    if (s >= 7) {
+      txt += '睡眠时长不错。';
+    } else if (s >= 5) {
+      txt += '睡眠偏短。';
+      tip = '小建议：睡前半小时放下手机、听一段轻音乐或做几次深呼吸，有助于更快入睡。';
+    } else {
+      txt += '睡眠明显不足。';
+      tip = '小建议：这个年龄段睡眠质量下降很常见，不必焦虑。可以试试睡前喝一杯温牛奶、保持房间凉爽、减少下午的咖啡因摄入。';
+    }
+    if (avg !== null) txt += `近${n}天平均 ${avg} 小时。`;
+    if (n === 1) txt += '记录更多天后可以看到趋势变化。';
+    sleepEl.innerHTML = `<span style="color:#666;">${txt}</span>${tip ? '<br><span style="color:#aaa;">'+tip+'</span>' : ''}`;
+  } else {
+    sleepEl.textContent = n === 1 ? '今天是第一条记录，继续坚持可以看到睡眠变化趋势。' : '';
+  }
+
+  // 饮水分析文字
+  const waterEl = document.getElementById('water-insight');
+  if (todayRecord && todayRecord.water != null) {
+    const w = todayRecord.water;
+    const ml = w * 200;
+    let wtxt = `今天喝了 ${w} 杯白水（约 ${ml} ml）。`;
+    let why = '';
+    if (w >= 6) {
+      wtxt += '饮水充足，很好。';
+      waterEl.style.color = '#3b6d11';
+    } else if (w >= 4) {
+      wtxt += `还差 ${6-w} 杯达到建议量。`;
+      why = '水分不足时，关节润滑下降，容易感到疲倦和头痛，也会影响消化。可以在下午固定补一杯。';
+      waterEl.style.color = '#ba7517';
+    } else {
+      wtxt += '今天喝水偏少。';
+      why = '水分不足会让身体误以为"饿了"而增加食欲，同时加重便秘、疲劳感，也不利于钙的吸收。建议把水杯放在显眼处，每次小口慢喝。';
+      waterEl.style.color = '#c0392b';
+    }
+    waterEl.innerHTML = `<span>${wtxt}</span>${why?'<br><span style="color:#aaa;font-size:11px;">'+why+'</span>':''}`;
+  } else {
+    waterEl.style.color = '#bbb';
+    waterEl.textContent = '建议每日白水 6-8 杯（1200-1600 ml）';
+  }
+}
+
+  // 营养分类定义移至全局，见上方
+
+  function renderFoodStats(todayFoods, allRecords) {
+    const n = allRecords.length;
+    // 今日达标情况
+    const todaySet = new Set(todayFoods);
+
+    // 历史各类达标天数
+    const groupHitDays = {};
+    NUTRIENT_GROUPS.forEach(g => { groupHitDays[g.key] = 0; });
+    allRecords.forEach(r => {
+      const fset = new Set(r.food || []);
+      NUTRIENT_GROUPS.forEach(g => {
+        if (g.items.some(i => fset.has(i))) groupHitDays[g.key]++;
+      });
+    });
+
+    const todayHit = NUTRIENT_GROUPS.filter(g => g.items.some(i => todaySet.has(i))).length;
+    const total = NUTRIENT_GROUPS.length;
+
+    // 饼图区域
+    const pieHTML = `
+      <div style="display:flex;align-items:center;gap:20px;margin-bottom:1.25rem;">
+        <div style="position:relative;width:80px;height:80px;flex-shrink:0;">
+          <svg viewBox="0 0 36 36" style="width:80px;height:80px;transform:rotate(-90deg);">
+            <circle cx="18" cy="18" r="15.9" fill="none" stroke="#f0ede8" stroke-width="3.5"/>
+            <circle cx="18" cy="18" r="15.9" fill="none" stroke="#534ab7" stroke-width="3.5"
+              stroke-dasharray="${Math.round(todayHit/total*100)} 100"
+              stroke-linecap="round"/>
+          </svg>
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;">
+            <div style="font-size:18px;font-weight:500;color:#534ab7;">${todayHit}</div>
+            <div style="font-size:10px;color:#aaa;">/ ${total}</div>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:15px;font-weight:500;color:#1a1a1a;">今日已覆盖 ${todayHit} 类</div>
+          <div style="font-size:12px;color:#aaa;margin-top:3px;line-height:1.6;">
+            ${todayHit >= 5 ? '摄入均衡，今天做得很好 🌿' :
+              todayHit >= 3 ? '基本覆盖，可以补充' + NUTRIENT_GROUPS.filter(g => !g.items.some(i => todaySet.has(i))).map(g=>g.label).join('、') :
+              '今天摄入偏少，可以尝试补充更多种类'}
+          </div>
+        </div>
+      </div>`;
+
+    const groupRows = NUTRIENT_GROUPS.map((g, gi) => {
+      const hit = g.items.some(i => todaySet.has(i));
+      const histPct = n > 0 ? Math.round(groupHitDays[g.key] / n * 100) : 0;
+      const hitItems = g.items.filter(i => todaySet.has(i)).map(i => FOOD_LABELS[i]).join('、');
+
+      const tipBox = `<div id="tip-${gi}" style="display:none;margin-top:6px;padding:8px 10px;background:#f7f6f3;border-radius:8px;font-size:12px;color:#555;line-height:1.7;">${g.tip}</div>`;
+
+      const statusLine = hit
+        ? `<div style="font-size:11px;color:${g.color};margin-top:3px;">今天吃了：${hitItems}${n>1?' · 近'+n+'天达标率'+histPct+'%':''}</div>`
+        : `<div style="font-size:12px;color:#c0392b;margin-top:3px;font-weight:500;">今日未摄入 · 建议补充：${g.suggest}</div>
+           ${n>1?`<div style="font-size:11px;color:#ccc;margin-top:1px;">近${n}天达标率 ${histPct}%</div>`:''}`;
+
+      return `<div style="padding:9px 0;border-bottom:1px solid #f5f5f5;">
+        <div style="display:flex;align-items:flex-start;gap:8px;">
+          <div style="width:8px;height:8px;border-radius:50%;background:${hit?g.color:'#e0e0e0'};margin-top:5px;flex-shrink:0;"></div>
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                <span style="font-size:13px;font-weight:500;color:${hit?'#1a1a1a':'#aaa'};">${g.label}</span>
+                ${hit?`<span style="font-size:11px;background:${g.lightColor};color:${g.color};padding:1px 7px;border-radius:10px;">已摄入</span>`:''}
+              </div>
+              <span onclick="toggleTip('tip-${gi}')" style="font-size:11px;color:#bbb;cursor:pointer;white-space:nowrap;flex-shrink:0;text-decoration:underline;">这是什么？</span>
+            </div>
+            <div style="font-size:11px;color:#bbb;margin-top:1px;">${g.desc}</div>
+            ${tipBox}
+            ${statusLine}
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+
+    document.getElementById('food-stats').innerHTML = pieHTML + groupRows;
+  }
+
+  function renderNutritionInsight(todayFoods) {
+    if (todayFoods.length === 0) {
+      document.getElementById('nutrition-insight-card').style.display = 'none';
+      return;
+    }
+    const todaySet = new Set(todayFoods);
+    const missing = NUTRIENT_GROUPS.filter(g => !g.items.some(i => todaySet.has(i)));
+    const insights = [];
+
+    // 蛋白替代说明
+    if (!todaySet.has('meat') && !todaySet.has('fish')) {
+      if (todaySet.has('egg') || todaySet.has('tofu')) {
+        insights.push('今天没有吃肉或鱼，但鸡蛋 / 豆腐已能提供足够的优质蛋白，不需要担心。');
+      }
+    }
+    // 豆制品加分说明
+    if (todaySet.has('milk') || todaySet.has('tofu')) {
+      insights.push('豆制品中的大豆异黄酮有类雌激素作用，可以帮助缓解潮热和情绪波动，今天摄入了很好。');
+    }
+    // 搭配建议：已吃某类，推荐搭什么
+    if (todaySet.has('veggie') && !todaySet.has('fruit')) {
+      insights.push('今天吃了蔬菜，如果能再加一个水果，维生素C的摄入会更全面，也有助于钙的吸收。');
+    }
+    if ((todaySet.has('meat') || todaySet.has('fish')) && !todaySet.has('veggie')) {
+      insights.push('今天摄入了蛋白质，搭配一些深色蔬菜会让营养更均衡，蔬菜中的纤维也能帮助消化肉类。');
+    }
+    if (todaySet.has('rice') || todaySet.has('noodle') || todaySet.has('porridge')) {
+      if (!todaySet.has('egg') && !todaySet.has('meat') && !todaySet.has('fish') && !todaySet.has('tofu')) {
+        insights.push('今天吃了主食，搭配一些蛋白质（鸡蛋、豆腐或肉）会让能量更稳定，不容易饿得快。');
+      }
+    }
+    // 缺少项简短提示（最多1条）
+    if (missing.length > 0 && missing.length <= 2) {
+      insights.push('今天可以补充：' + missing.map(g => g.label + '（' + g.suggest + '）').join('；') + '。');
+    }
+
+    if (insights.length === 0) {
+      document.getElementById('nutrition-insight-card').style.display = 'none';
+      return;
+    }
+    document.getElementById('nutrition-insight-card').style.display = 'block';
+    document.getElementById('nutrition-insight').innerHTML =
+      insights.map(t => `<div style="font-size:13px;color:#444;line-height:1.8;padding:5px 0;border-bottom:1px solid #f5f5f5;">${t}</div>`).join('');
+  }
+
+function drawSleepChart(records) {
+  const canvas = document.getElementById('sleep-chart');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.parentElement.offsetWidth || 360;
+  const H = 120;
+  canvas.width = W;
+  canvas.height = H;
+  ctx.clearRect(0, 0, W, H);
+
+  if (records.length === 0) {
+    ctx.fillStyle = '#bbb';
+    ctx.font = '13px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('暂无数据', W/2, H/2);
+    return;
+  }
+
+  const vals = records.map(r => r.sleep || 7);
+  const minV = Math.max(0, Math.min(...vals) - 1);
+  const maxV = Math.min(12, Math.max(...vals) + 1);
+  const pad = { l: 28, r: 16, t: 20, b: 28 };
+  const chartW = W - pad.l - pad.r;
+  const chartH = H - pad.t - pad.b;
+
+  const xPos = i => records.length === 1 ? pad.l + chartW / 2 : pad.l + (i / (vals.length - 1)) * chartW;
+  const yPos = v => minV === maxV ? pad.t + chartH / 2 : pad.t + (1 - (v - minV) / (maxV - minV)) * chartH;
+
+  // 折线（单点时跳过）
+  if (records.length > 1) {
+    ctx.beginPath();
+    vals.forEach((v, i) => { i === 0 ? ctx.moveTo(xPos(i), yPos(v)) : ctx.lineTo(xPos(i), yPos(v)); });
+    ctx.strokeStyle = '#534ab7'; ctx.lineWidth = 2; ctx.stroke();
+  }
+
+  // 点 + 数值标签
+  vals.forEach((v, i) => {
+    ctx.beginPath();
+    ctx.arc(xPos(i), yPos(v), 4, 0, Math.PI * 2);
+    ctx.fillStyle = '#534ab7'; ctx.fill();
+    ctx.fillStyle = '#534ab7'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(v + 'h', xPos(i), yPos(v) - 10);
+  });
+
+  // X轴日期
+  records.forEach((r, i) => {
+    ctx.fillStyle = '#bbb'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+    const label = formatKey(r.date).replace('月', '/').replace('日', '');
+    ctx.fillText(label, xPos(i), H - 6);
+  });
+}
+
+function drawWaterChart(records) {
+  const canvas = document.getElementById('water-chart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.parentElement.offsetWidth || 360;
+  const H = 100;
+  canvas.width = W; canvas.height = H;
+  ctx.clearRect(0, 0, W, H);
+  if (records.length === 0) {
+    ctx.fillStyle = '#bbb'; ctx.font = '13px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('暂无数据', W/2, H/2); return;
+  }
+  const vals = records.map(r => r.water != null ? r.water : 4);
+  const maxV = Math.max(...vals, 8) + 1;
+  const pad = { l: 28, r: 16, t: 16, b: 24 };
+  const chartW = W - pad.l - pad.r;
+  const chartH = H - pad.t - pad.b;
+  const xPos = i => records.length === 1 ? pad.l + chartW/2 : pad.l + (i/(vals.length-1))*chartW;
+  const yPos = v => pad.t + (1 - v/maxV)*chartH;
+  if (records.length > 1) {
+    ctx.beginPath();
+    vals.forEach((v,i) => { i===0 ? ctx.moveTo(xPos(i),yPos(v)) : ctx.lineTo(xPos(i),yPos(v)); });
+    ctx.strokeStyle = '#1d9e75'; ctx.lineWidth = 2; ctx.stroke();
+  }
+  vals.forEach((v,i) => {
+    ctx.beginPath(); ctx.arc(xPos(i),yPos(v),4,0,Math.PI*2);
+    ctx.fillStyle = '#1d9e75'; ctx.fill();
+    ctx.fillStyle = '#1d9e75'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(v+'杯', xPos(i), yPos(v)-8);
+  });
+  records.forEach((r,i) => {
+    ctx.fillStyle = '#bbb'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(formatKey(r.date).replace('月','/').replace('日',''), xPos(i), H-4);
+  });
+}
+
+// ── 历史页渲染 ────────────────────────────────────────
+function renderHistory() {
+  const all = loadRecords();
+  const keys = Object.keys(all).sort().reverse();
+  const el = document.getElementById('history-list');
+  if (keys.length === 0) {
+    el.innerHTML = '<div class="stat-empty">暂无记录</div>';
+    return;
+  }
+  const moodMap = { good: '😊 不错', normal: '😐 一般', bad: '😔 较差' };
+  el.innerHTML = keys.map(k => {
+    const r = all[k];
+    const foodList = (r.food || []);
+    const signalList = (r.signal || []);
+
+    const foodTags = foodList.length > 0
+      ? foodList.map(f => `<span class="tag">${FOOD_LABELS[f] || f}</span>`).join('')
+      : '<span style="font-size:12px;color:#ccc;">未选择</span>';
+
+    const signalTags = signalList.length > 0
+      ? signalList.map(s => `<span class="tag signal-tag">${SIGNAL_LABELS[s] || s}</span>`).join('')
+      : '<span style="font-size:12px;color:#3b6d11;">无不适 🌿</span>';
+
+    return `<div class="history-item">
+      <div class="history-date">${formatKey(k)}</div>
+      <div class="history-detail">
+        <div style="display:flex;gap:16px;margin-bottom:6px;">
+          <span>🌙 睡眠 <strong>${r.sleep}h</strong></span>
+          <span>💧 喝水 <strong>${r.water != null ? r.water : '-'}杯</strong></span>
+          <span>${moodMap[r.mood] || '😐 一般'}</span>
+        </div>
+        <div style="margin-bottom:4px;">
+          <span style="font-size:11px;color:#aaa;display:block;margin-bottom:3px;">今日饮食</span>
+          ${foodTags}
+        </div>
+        <div>
+          <span style="font-size:11px;color:#aaa;display:block;margin-bottom:3px;">身体状况</span>
+          ${signalTags}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+</script>
+</body>
+</html>
